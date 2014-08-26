@@ -3,18 +3,34 @@
 require_once 'manageorgreps.civix.php';
 
 /**
- * Implementation of hook_civicrm_config
+ * Implementation of hook_civicrm_post
  */
 function manageorgreps_civicrm_post($op, $objectName, $objectId, &$objectRef) {
   if ($objectName=='Profile' && $op=='create'){
     if ($objectRef['uf_group_id']==13){ //selected profile id
        $contact_id = $objectId;
-print_r($objectRef); die();
-    }
-  }
+       $orgrepid = 17;
+       $params = array(
+         'version' => 3,
+         'relationship_type_id' => $orgrepid,
+         'contact_id_a' => $contact_id,
+         'contact_id_b' => 1, //get org id
 
+       );
+    }
+    //$op=='edit'
+  }
 }
 
+/**
+ * Implementation of hook_civicrm_buildForm
+ */
+function manageorgreps_civicrm_buildForm($formName, &$form) {
+  if ($formName == 'CRM_Profile_Form_Edit'){
+    CRM_Core_Resources::singleton()->addScriptFile('com.aghstrategies.manageorgreps', 'js/getorgname.js');
+
+  }
+}
 
 /**
  * Implementation of hook_civicrm_config
