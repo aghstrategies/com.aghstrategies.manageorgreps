@@ -7,10 +7,11 @@ require_once 'manageorgreps.civix.php';
  */
 function manageorgreps_civicrm_post($op, $objectName, $objectId, &$objectRef) {
   if ($objectName=='Profile' && $op=='create'){
-    if ($objectRef['uf_group_id']==13){ //selected profile id
+    $orgrep_profile_id = get_orgrep_profile_id();
+    if ($objectRef['uf_group_id']==$orgrep_profile_id){
       $org_id = $objectRef['organizationalaffiliation'];
        $contact_id = $objectId;
-       $relationship_type_id = 17;
+       $relationship_type_id = get_organizational_relationship_id();
        $params = array(
          'version' => 3,
          'relationship_type_id' => $relationship_type_id,
@@ -33,7 +34,8 @@ function manageorgreps_civicrm_post($op, $objectName, $objectId, &$objectRef) {
 function manageorgreps_civicrm_buildForm($formName, &$form) {
   if ($formName == 'CRM_Profile_Form_Edit'){
     $gid = $form->getVar('_gid');
-    if ($gid==13){//profile id
+    $orgrep_profile_id = get_orgrep_profile_id();
+    if ($gid==$orgrep_profile_id){//profile id
     $form->add('text', 'organizationalaffiliation', ts('Organization Affiliation'));
     $org_id = '';
     if (array_key_exists('org_id', $_GET)){
@@ -66,13 +68,15 @@ function manageorgreps_civicrm_tokens( &$tokens ) {
  * Implementation of hook_civicrm_tokenValues
  */
 function manageorgreps_civicrm_tokenValues(&$values, $cids, $job = null, $tokens = array(), $context = null) {
-  $gid = 13;
+  $orgrep_profile_id = get_orgrep_profile_id();
+  $gid = $orgrep_profile_id;
   if (!empty($tokens['org_reps'])){
+    $relationship_type_id = get_organizational_relationship_id();
     foreach($cids as $cid){
       try{
          $relationships = civicrm_api3('Relationship', 'get', array(
             'contact_id_b'   =>  $cid,
-            'relationship_type_id' => 17, //relationship type id
+            'relationship_type_id' => $relationship_type_id,
          ));
       }
       catch (CiviCRM_API3_Exception $e) {
@@ -180,4 +184,45 @@ function manageorgreps_civicrm_managed(&$entities) {//add uf group and uf fields
       'is_active' => 1,
       ),
   );
+  $entities[] = array(
+    'module' => 'com.aghstrategies.manageorgreps',
+    'name' => 'Update Organizational Contacts',
+    'entity' => 'UFGroup',
+    'params' => array(
+      'version' => '3',
+      'group_type' => 'Contact,Individual',
+      'name' => 'update_organizational_contacts',
+      'title' => 'Update Organizational Contacts',
+      'is_reserved' => 1,
+      'is_active' => 1,
+      ),
+  );
+
+}
+
+function get_organizational_relationship_id(){
+  try{
+     $relationshiptype = civicrm_api3('RelationshipType', 'getSingle', array(
+        'name_a_b'   =>  'Organizational Representative of',
+        'name_b_a' => 'Organizational Representative is',
+     ));
+    }
+  catch (CiviCRM_API3_Exception $e) {
+    $error = $e->getMessage();
+  }
+  return $relationshiptype['id'];
+}
+
+function get_orgrep_profile_id(){
+  try{
+     $ufgroup = civicrm_api3('UFGroup', 'getSingle', array(
+      'title' => 'Update Organizational Contacts',
+      'is_reserved' => 1,
+     ));
+
+    }
+  catch (CiviCRM_API3_Exception $e) {
+    $error = $e->getMessage();
+  }
+  return $ufgroup['id'];
 }
