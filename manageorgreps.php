@@ -8,15 +8,20 @@ require_once 'manageorgreps.civix.php';
 function manageorgreps_civicrm_post($op, $objectName, $objectId, &$objectRef) {
   if ($objectName=='Profile' && $op=='create'){
     if ($objectRef['uf_group_id']==13){ //selected profile id
+      $org_id = $objectRef['organizationalaffiliation'];
        $contact_id = $objectId;
-       $orgrepid = 17;
+       $relationship_type_id = 17;
        $params = array(
          'version' => 3,
-         'relationship_type_id' => $orgrepid,
+         'relationship_type_id' => $relationship_type_id,
          'contact_id_a' => $contact_id,
-         'contact_id_b' => 1, //get org id
+         'contact_id_b' => $org_id, //get org id
 
        );
+    }
+    $result = civicrm_api('Relationship', 'Create', $params);
+    if ($result['is_error']){
+      print_r($result['error_message']);
     }
     //$op=='edit'
   }
@@ -27,8 +32,70 @@ function manageorgreps_civicrm_post($op, $objectName, $objectId, &$objectRef) {
  */
 function manageorgreps_civicrm_buildForm($formName, &$form) {
   if ($formName == 'CRM_Profile_Form_Edit'){
+    $gid = $form->getVar('_gid');
+    if ($gid==13){//profile id
+    $form->add('text', 'organizationalaffiliation', ts('Organization Affiliation'));
+    $org_id = '';
+    if (array_key_exists('org_id', $_GET)){
+      $org_id = $_GET['org_id'];
+    }
+    $form->assign('org_id', $org_id);
+    // $ the field element in the form
+    $form->add('text', 'testfield', ts('Test field'));
+    // dynamically insert a template block in the page
+    $templatePath = realpath(dirname(__FILE__)."/templates");
+    CRM_Core_Region::instance('page-body')->add(array(
+      'template' => "{$templatePath}/organizationalaffiliation.tpl"
+     ));
+    }
     CRM_Core_Resources::singleton()->addScriptFile('com.aghstrategies.manageorgreps', 'js/getorgname.js');
 
+  }
+}
+
+/**
+ * Implementation of hook_civicrm_token
+ */
+function manageorgreps_civicrm_tokens( &$tokens ) {
+  $tokens['org_reps'] = array(
+    'org_reps.list' => ts("Organizational Representatives List"),
+  );
+}
+
+/**
+ * Implementation of hook_civicrm_tokenValues
+ */
+function manageorgreps_civicrm_tokenValues(&$values, $cids, $job = null, $tokens = array(), $context = null) {
+  $gid = 13;
+  if (!empty($tokens['org_reps'])){
+    foreach($cids as $cid){
+      try{
+         $relationships = civicrm_api3('Relationship', 'get', array(
+            'contact_id_b'   =>  $cid,
+            'relationship_type_id' => 17, //relationship type id
+         ));
+      }
+      catch (CiviCRM_API3_Exception $e) {
+        $error = $e->getMessage();
+      }
+      $list = '';
+      foreach ($relationships['values'] as $relationship){
+        $contact_a = $relationship['contact_id_a'];
+        try{
+         $contact = civicrm_api3('Contact', 'getSingle', array(
+            'id'   =>  $contact_a,
+         ));
+        }
+        catch (CiviCRM_API3_Exception $e) {
+          $error = $e->getMessage();
+        }
+        $profile_link = CRM_Utils_System::url('civicrm/profile/edit', $query = 'reset=1&gid='.$gid.'&id='.$contact_a.'&org_id='.$cid,  true, null, true, true);
+
+        $list .= '<div>'.$contact['display_name'] . ' Update:' .$profile_link.'</div>';
+      }
+      $token = array('org_reps.list' => $list);
+      $values[$cid] = empty($values[$cid]) ? $token : $values[$cid] + $token;
+    }
   }
 }
 
