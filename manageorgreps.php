@@ -17,7 +17,6 @@ function manageorgreps_civicrm_post($op, $objectName, $objectId, &$objectRef) {
          'relationship_type_id' => $relationship_type_id,
          'contact_id_a' => $contact_id,
          'contact_id_b' => $org_id, //get org id
-
        );
     }
     $result = civicrm_api('Relationship', 'Create', $params);
@@ -61,6 +60,7 @@ function manageorgreps_civicrm_buildForm($formName, &$form) {
 function manageorgreps_civicrm_tokens( &$tokens ) {
   $tokens['org_reps'] = array(
     'org_reps.list' => ts("Organizational Representatives List"),
+    'org_reps.link' => ts("Add Organizational Representatives Link"),
   );
 }
 
@@ -70,9 +70,11 @@ function manageorgreps_civicrm_tokens( &$tokens ) {
 function manageorgreps_civicrm_tokenValues(&$values, $cids, $job = null, $tokens = array(), $context = null) {
   $orgrep_profile_id = get_orgrep_profile_id();
   $gid = $orgrep_profile_id;
+
   if (!empty($tokens['org_reps'])){
     $relationship_type_id = get_organizational_relationship_id();
     foreach($cids as $cid){
+      $cid_cs = CRM_Contact_BAO_Contact_Utils::generateChecksum( $cid );
       try{
          $relationships = civicrm_api3('Relationship', 'get', array(
             'contact_id_b'   =>  $cid,
@@ -93,11 +95,17 @@ function manageorgreps_civicrm_tokenValues(&$values, $cids, $job = null, $tokens
         catch (CiviCRM_API3_Exception $e) {
           $error = $e->getMessage();
         }
-        $profile_link = CRM_Utils_System::url('civicrm/profile/edit', $query = 'reset=1&gid='.$gid.'&id='.$contact_a.'&org_id='.$cid,  true, null, true, true);
+        $contact_profile_link = '';
 
-        $list .= '<div>'.$contact['display_name'] . ' Update:' .$profile_link.'</div>';
+        $contact_a_cs = CRM_Contact_BAO_Contact_Utils::generateChecksum( $contact_a );
+
+        $contact_profile_link = CRM_Utils_System::url('civicrm/profile/edit', $query = 'reset=1&gid='.$gid.'&id='.$contact_a.'&org_id='.$cid.'&cs='.$contact_a_cs,  true, null, true, true);
+        // $contact_delete_link = CRM_Utils_System::url('civicrm/ajax/rest', $query = 'entity=Relationship&action=delete&debug=1&sequential=1&json=1&id='.$relationship_id,  true, null, true, true);
+
+        $list .= '<div>'.$contact['display_name'] . ' <a href="' .$contact_profile_link.'">Update</a></div>';
       }
-      $token = array('org_reps.list' => $list);
+      $profile_link = CRM_Utils_System::url('civicrm/profile/create', $query = 'reset=1&gid='.$gid.'&org_id='.$cid.'&cs='.$cid_cs,  true, null, true, true);
+      $token = array('org_reps.list' => $list, 'org_reps.link' => $profile_link);
       $values[$cid] = empty($values[$cid]) ? $token : $values[$cid] + $token;
     }
   }
@@ -138,8 +146,12 @@ function manageorgreps_civicrm_install() {
       'uf_group_id' => $ufgroup['id'],
       'module' => 'Profile',
       'is_active' => '1',
+      'weight' => '1',
     );
     $ufjoin = civicrm_api('UFJoin', 'create', $params);
+    if ($ufjoin['is_error']){
+      print_r($ufjoin['error_message']); die();
+    }
   }
 }
 
@@ -147,7 +159,11 @@ function manageorgreps_civicrm_install() {
  * Implementation of hook_civicrm_uninstall
  */
 function manageorgreps_civicrm_uninstall() {
-  return _manageorgreps_civix_civicrm_uninstall();
+  $profile_id =  get_orgrep_profile_id();
+  $params= array('version' => '3', 'id' => $profile_id);
+  civicrm_api('UFGroup', 'delete', $params);
+  $params= array('version' => '3', 'uf_group_id' => $profile_id);
+  civicrm_api('UFJoin', 'delete', $params);
 }
 
 /**
@@ -161,7 +177,19 @@ function manageorgreps_civicrm_enable() {
  * Implementation of hook_civicrm_disable
  */
 function manageorgreps_civicrm_disable() {
-  return _manageorgreps_civix_civicrm_disable();
+  $profile_id =  get_orgrep_profile_id();
+  $params= array('version' => '3', 'id' => $profile_id, 'is_active' => 1);
+  civicrm_api('UFGroup', 'create', $params);
+  try{
+    $ufjoin = civicrm_api3('UFJoin', 'getSingle', array(
+      'uf_group_id' => $profile_id,
+     ));
+  }
+  catch (CiviCRM_API3_Exception $e) {
+    $error = $e->getMessage();
+  }
+  $params= array('version' => '3', 'uf_group_id' => $profile_id, 'id' => $ufjoin['id'], 'is_active' => 1);
+  civicrm_api('UFJoin', 'create', $params);
 }
 
 /**
@@ -222,7 +250,6 @@ function get_orgrep_profile_id(){
       'title' => 'Update Organizational Contacts',
       'is_reserved' => 1,
      ));
-
     }
   catch (CiviCRM_API3_Exception $e) {
     $error = $e->getMessage();

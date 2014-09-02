@@ -96,10 +96,10 @@ function _manageorgreps_civix_civicrm_upgrade($op, CRM_Queue_Queue $queue = NULL
 }
 
 function _manageorgreps_civix_upgrader() {
-  if (!file_exists(__DIR__.'/CRM/Manageorgreps/Upgrader.php')) {
+  if (!file_exists(__DIR__.'/CRM/Updateorginfo/Upgrader.php')) {
     return NULL;
   } else {
-    return CRM_Manageorgreps_Upgrader_Base::instance();
+    return CRM_Updateorginfo_Upgrader_Base::instance();
   }
 }
 

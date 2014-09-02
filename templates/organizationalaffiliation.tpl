@@ -5,6 +5,7 @@
 </div>
 {* reposition the above block after #someOtherBlock *}
 <script type="text/javascript">
-  cj('#organizationalaffiliation-tr').insertAfter('#editrow-email-Primary');
+  cj('#organizationalaffiliation-tr').insertBefore('.crm-submit-buttons');
   cj('#organizationalaffiliation').val("{$org_id}");
+  cj('#organizationalaffiliation-tr').css("visibility", "hidden");
 </script>
