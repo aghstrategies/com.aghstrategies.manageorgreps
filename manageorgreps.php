@@ -123,7 +123,24 @@ function manageorgreps_civicrm_xmlMenu(&$files) {
  * Implementation of hook_civicrm_install
  */
 function manageorgreps_civicrm_install() {
-  return _manageorgreps_civix_civicrm_install();
+  $params = array(
+      'version' => '3',
+      'group_type' => 'Contact,Individual',
+      'name' => 'update_organizational_contacts',
+      'title' => 'Update Organizational Contacts',
+      'is_reserved' => 1,
+      'is_active' => 1,
+      );
+  $ufgroup = civicrm_api('UFGroup', 'create', $params);
+  if (!$ufgroup['is_error']){
+    $params = array(
+      'version' => '3',
+      'uf_group_id' => $ufgroup['id'],
+      'module' => 'Profile',
+      'is_active' => '1',
+    );
+    $ufjoin = civicrm_api('UFJoin', 'create', $params);
+  }
 }
 
 /**
@@ -184,20 +201,6 @@ function manageorgreps_civicrm_managed(&$entities) {//add uf group and uf fields
       'is_active' => 1,
       ),
   );
-  $entities[] = array(
-    'module' => 'com.aghstrategies.manageorgreps',
-    'name' => 'Update Organizational Contacts',
-    'entity' => 'UFGroup',
-    'params' => array(
-      'version' => '3',
-      'group_type' => 'Contact,Individual',
-      'name' => 'update_organizational_contacts',
-      'title' => 'Update Organizational Contacts',
-      'is_reserved' => 1,
-      'is_active' => 1,
-      ),
-  );
-
 }
 
 function get_organizational_relationship_id(){
