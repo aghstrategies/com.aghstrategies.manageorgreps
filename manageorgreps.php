@@ -12,11 +12,13 @@ function manageorgreps_civicrm_post($op, $objectName, $objectId, &$objectRef) {
       $org_id = $objectRef['organizationalaffiliation'];
        $contact_id = $objectId;
        $relationship_type_id = get_organizational_relationship_id();
+       $start_date = date('Y-d-m');
        $params = array(
          'version' => 3,
          'relationship_type_id' => $relationship_type_id,
          'contact_id_a' => $contact_id,
          'contact_id_b' => $org_id, //get org id
+         'start_date' => $start_date,
        );
     }
     $result = civicrm_api('Relationship', 'Create', $params);
@@ -79,30 +81,42 @@ function manageorgreps_civicrm_tokenValues(&$values, $cids, $job = null, $tokens
          $relationships = civicrm_api3('Relationship', 'get', array(
             'contact_id_b'   =>  $cid,
             'relationship_type_id' => $relationship_type_id,
+            'is_active' => 1,
          ));
       }
       catch (CiviCRM_API3_Exception $e) {
         $error = $e->getMessage();
       }
       $list = '';
-      foreach ($relationships['values'] as $relationship){
-        $contact_a = $relationship['contact_id_a'];
-        try{
-         $contact = civicrm_api3('Contact', 'getSingle', array(
-            'id'   =>  $contact_a,
-         ));
+      if ($relationships['count']>0){
+        $list .= '<table>
+                        <thead>
+                          <tr>
+                            <th>Name</th>
+                            <th>Email</th>
+                            <th>Actions</th>
+                        </thead>
+                        <tbody>';
+        foreach ($relationships['values'] as $relationship){
+          $contact_a = $relationship['contact_id_a'];
+          try{
+           $contact = civicrm_api3('Contact', 'getSingle', array(
+              'id'   =>  $contact_a,
+           ));
+          }
+          catch (CiviCRM_API3_Exception $e) {
+            $error = $e->getMessage();
+          }
+          $contact_profile_link = '';
+
+          $contact_a_cs = CRM_Contact_BAO_Contact_Utils::generateChecksum( $contact_a );
+
+          $contact_profile_link = CRM_Utils_System::url('civicrm/profile/edit', $query = 'reset=1&gid='.$gid.'&id='.$contact_a.'&org_id='.$cid.'&cs='.$contact_a_cs,  true, null, true, true);
+          $contact_delete_link = CRM_Utils_System::url('civicrm/delete_relationship', $query = 'relationship_id='.$relationship['id'].'&cs='.$contact_a_cs,  true, null, true, true);
+
+          $list .= '<tr><td>'.$contact['display_name'] . '</td><td> '.$contact['email'] .'</td><td> <a href="' .$contact_profile_link.'">Update User</a> | <a href="'.$contact_delete_link.'">Remove Representative</a></td><tr>';
         }
-        catch (CiviCRM_API3_Exception $e) {
-          $error = $e->getMessage();
-        }
-        $contact_profile_link = '';
-
-        $contact_a_cs = CRM_Contact_BAO_Contact_Utils::generateChecksum( $contact_a );
-
-        $contact_profile_link = CRM_Utils_System::url('civicrm/profile/edit', $query = 'reset=1&gid='.$gid.'&id='.$contact_a.'&org_id='.$cid.'&cs='.$contact_a_cs,  true, null, true, true);
-        // $contact_delete_link = CRM_Utils_System::url('civicrm/ajax/rest', $query = 'entity=Relationship&action=delete&debug=1&sequential=1&json=1&id='.$relationship_id,  true, null, true, true);
-
-        $list .= '<div>'.$contact['display_name'] . ' <a href="' .$contact_profile_link.'">Update</a></div>';
+        $list .='</tbody></table>';
       }
       $profile_link = CRM_Utils_System::url('civicrm/profile/create', $query = 'reset=1&gid='.$gid.'&org_id='.$cid.'&cs='.$cid_cs,  true, null, true, true);
       $token = array('org_reps.list' => $list, 'org_reps.link' => $profile_link);
