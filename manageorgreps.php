@@ -2,30 +2,106 @@
 
 require_once 'manageorgreps.civix.php';
 
+
+function _getMenuKeyMax($menuArray) {
+  $max = array(max(array_keys($menuArray)));
+  foreach($menuArray as $v) {
+    if (!empty($v['child'])) {
+      $max[] = _getMenuKeyMax($v['child']);
+    }
+  }
+  return max($max);
+}
+
+function manageorgreps_civicrm_navigationMenu( &$params ) {
+
+    //  Get the maximum key of $params
+  $maxKey = _getMenuKeyMax($params);
+  $profile_id = get_orgrep_profile_id();
+  $profileFields = CRM_Utils_System::url('civicrm/admin/uf/group/field', 'reset=1&action=browse&gid='.$profile_id, true, null, true, false);
+
+  // get the id of Administer Menu
+  $administerMenuId = CRM_Core_DAO::getFieldValue('CRM_Core_BAO_Navigation', 'Administer', 'id', 'name');
+
+  // skip adding menu if there is no administer menu
+  if ($administerMenuId) {
+    // get the maximum key under adminster menu
+    $maxKey = max( array_keys($params[$administerMenuId]['child']));
+    $params[$administerMenuId]['child'][$maxKey+1] = array (
+      'attributes' => array (
+        'label' => 'Administer Organizational Representative Profile',
+        'name' => 'AdministerOrgRepProfile',
+        'url' => $profileFields,
+        'permission' => 'administer CiviCRM',
+        'operator' => NULL,
+        'separator' => TRUE,
+        'parentID' => $administerMenuId,
+        'navID' => $maxKey+1,
+        'active' => 1
+        )
+      );
+  }
+}
+
 /**
  * Implementation of hook_civicrm_post
  */
 function manageorgreps_civicrm_post($op, $objectName, $objectId, &$objectRef) {
-  if ($objectName=='Profile' && $op=='create'){
-    $orgrep_profile_id = get_orgrep_profile_id();
-    if ($objectRef['uf_group_id']==$orgrep_profile_id){
-      $org_id = $objectRef['organizationalaffiliation'];
-       $contact_id = $objectId;
-       $relationship_type_id = get_organizational_relationship_id();
-       $start_date = date('Y-d-m');
-       $params = array(
-         'version' => 3,
-         'relationship_type_id' => $relationship_type_id,
-         'contact_id_a' => $contact_id,
+  $orgrep_profile_id = get_orgrep_profile_id();
+  if ($objectName=='Profile' && $objectRef['uf_group_id']==$orgrep_profile_id){
+    $org_id = $objectRef['organizationalaffiliation'];
+    $contact_id = $objectId;
+    $relationship_type_id = get_organizational_relationship_id();
+    $start_date = date('Y-m-d');
+
+    if ($op=='create'){
+      $params = array(
+       'version' => 3,
+       'relationship_type_id' => $relationship_type_id,
+       'contact_id_a' => $contact_id,
          'contact_id_b' => $org_id, //get org id
          'start_date' => $start_date,
-       );
+         );
+      $result = civicrm_api('Relationship', 'Create', $params);
+      if ($result['is_error']){
+        print_r($result['error_message']);
+      }
     }
-    $result = civicrm_api('Relationship', 'Create', $params);
-    if ($result['is_error']){
-      print_r($result['error_message']);
+    else if ($op=='edit'){
+      $params = array(
+       'version' => 3,
+       'relationship_type_id' => $relationship_type_id,
+       'contact_id_a' => $contact_id,
+         'contact_id_b' => $org_id, //get org id
+         );
+      $result = civicrm_api('Relationship', 'Get', $params);
+      if (!$result['is_error']){
+        if ($result['count']>0){
+          foreach ($result['values'] as $relationship){
+            if (!$relationship['is_active']){
+              $params = array(
+               'version' => 3,
+               'id' => $relationship['id'],
+                'start_date' => $start_date,
+                'end_date' => ' ',
+                'is_active' => 1,
+                );
+              $result = civicrm_api('Relationship', 'Create', $params);
+            }
+          }
+        }
+        else{
+          $params = array(
+           'version' => 3,
+           'relationship_type_id' => $relationship_type_id,
+           'contact_id_a' => $contact_id,
+         'contact_id_b' => $org_id, //get org id
+         'start_date' => $start_date,
+         );
+          $result = civicrm_api('Relationship', 'Create', $params);
+        }
+      }
     }
-    //$op=='edit'
   }
 }
 
@@ -37,19 +113,19 @@ function manageorgreps_civicrm_buildForm($formName, &$form) {
     $gid = $form->getVar('_gid');
     $orgrep_profile_id = get_orgrep_profile_id();
     if ($gid==$orgrep_profile_id){//profile id
-    $form->add('text', 'organizationalaffiliation', ts('Organization Affiliation'));
-    $org_id = '';
-    if (array_key_exists('org_id', $_GET)){
-      $org_id = $_GET['org_id'];
-    }
-    $form->assign('org_id', $org_id);
+      $form->add('text', 'organizationalaffiliation', ts('Organization Affiliation'));
+      $org_id = '';
+      if (array_key_exists('org_id', $_GET)){
+        $org_id = $_GET['org_id'];
+      }
+      $form->assign('org_id', $org_id);
     // $ the field element in the form
-    $form->add('text', 'testfield', ts('Test field'));
+      $form->add('text', 'testfield', ts('Test field'));
     // dynamically insert a template block in the page
-    $templatePath = realpath(dirname(__FILE__)."/templates");
-    CRM_Core_Region::instance('page-body')->add(array(
-      'template' => "{$templatePath}/organizationalaffiliation.tpl"
-     ));
+      $templatePath = realpath(dirname(__FILE__)."/templates");
+      CRM_Core_Region::instance('page-body')->add(array(
+        'template' => "{$templatePath}/organizationalaffiliation.tpl"
+        ));
     }
     CRM_Core_Resources::singleton()->addScriptFile('com.aghstrategies.manageorgreps', 'js/getorgname.js');
 
@@ -63,7 +139,7 @@ function manageorgreps_civicrm_tokens( &$tokens ) {
   $tokens['org_reps'] = array(
     'org_reps.list' => ts("Organizational Representatives List"),
     'org_reps.link' => ts("Add Organizational Representatives Link"),
-  );
+    );
 }
 
 /**
@@ -78,51 +154,51 @@ function manageorgreps_civicrm_tokenValues(&$values, $cids, $job = null, $tokens
     foreach($cids as $cid){
       $cid_cs = CRM_Contact_BAO_Contact_Utils::generateChecksum( $cid );
       try{
-         $relationships = civicrm_api3('Relationship', 'get', array(
-            'contact_id_b'   =>  $cid,
-            'relationship_type_id' => $relationship_type_id,
-            'is_active' => 1,
-         ));
-      }
-      catch (CiviCRM_API3_Exception $e) {
+       $relationships = civicrm_api3('Relationship', 'get', array(
+        'contact_id_b'   =>  $cid,
+        'relationship_type_id' => $relationship_type_id,
+        'is_active' => 1,
+        ));
+     }
+     catch (CiviCRM_API3_Exception $e) {
+      $error = $e->getMessage();
+    }
+    $list = '';
+    if ($relationships['count']>0){
+      $list .= '<table>
+      <thead>
+      <tr>
+      <th>Name</th>
+      <th>Email</th>
+      <th>Actions</th>
+      </thead>
+      <tbody>';
+      foreach ($relationships['values'] as $relationship){
+        $contact_a = $relationship['contact_id_a'];
+        try{
+         $contact = civicrm_api3('Contact', 'getSingle', array(
+          'id'   =>  $contact_a,
+          ));
+       }
+       catch (CiviCRM_API3_Exception $e) {
         $error = $e->getMessage();
       }
-      $list = '';
-      if ($relationships['count']>0){
-        $list .= '<table>
-                        <thead>
-                          <tr>
-                            <th>Name</th>
-                            <th>Email</th>
-                            <th>Actions</th>
-                        </thead>
-                        <tbody>';
-        foreach ($relationships['values'] as $relationship){
-          $contact_a = $relationship['contact_id_a'];
-          try{
-           $contact = civicrm_api3('Contact', 'getSingle', array(
-              'id'   =>  $contact_a,
-           ));
-          }
-          catch (CiviCRM_API3_Exception $e) {
-            $error = $e->getMessage();
-          }
-          $contact_profile_link = '';
+      $contact_profile_link = '';
 
-          $contact_a_cs = CRM_Contact_BAO_Contact_Utils::generateChecksum( $contact_a );
+      $contact_a_cs = CRM_Contact_BAO_Contact_Utils::generateChecksum( $contact_a );
 
-          $contact_profile_link = CRM_Utils_System::url('civicrm/profile/edit', $query = 'reset=1&gid='.$gid.'&id='.$contact_a.'&org_id='.$cid.'&cs='.$contact_a_cs,  true, null, true, true);
-          $contact_delete_link = CRM_Utils_System::url('civicrm/delete_relationship', $query = 'relationship_id='.$relationship['id'].'&cs='.$contact_a_cs,  true, null, true, true);
+      $contact_profile_link = CRM_Utils_System::url('civicrm/profile/edit', $query = 'reset=1&gid='.$gid.'&id='.$contact_a.'&org_id='.$cid.'&cs='.$contact_a_cs,  true, null, true, true);
+      $contact_delete_link = CRM_Utils_System::url('civicrm/delete_relationship', $query = 'relationship_id='.$relationship['id'].'&cs='.$contact_a_cs,  true, null, true, true);
 
-          $list .= '<tr><td>'.$contact['display_name'] . '</td><td> '.$contact['email'] .'</td><td> <a href="' .$contact_profile_link.'">Update User</a> | <a href="'.$contact_delete_link.'">Remove Representative</a></td><tr>';
-        }
-        $list .='</tbody></table>';
-      }
-      $profile_link = CRM_Utils_System::url('civicrm/profile/create', $query = 'reset=1&gid='.$gid.'&org_id='.$cid.'&cs='.$cid_cs,  true, null, true, true);
-      $token = array('org_reps.list' => $list, 'org_reps.link' => $profile_link);
-      $values[$cid] = empty($values[$cid]) ? $token : $values[$cid] + $token;
+      $list .= '<tr><td>'.$contact['display_name'] . '</td><td> '.$contact['email'] .'</td><td> <a href="' .$contact_profile_link.'">Update User</a> | <a href="'.$contact_delete_link.'">Remove Representative</a></td><tr>';
     }
+    $list .='</tbody></table>';
   }
+  $profile_link = CRM_Utils_System::url('civicrm/profile/create', $query = 'reset=1&gid='.$gid.'&org_id='.$cid.'&cs='.$cid_cs,  true, null, true, true);
+  $token = array('org_reps.list' => $list, 'org_reps.link' => $profile_link);
+  $values[$cid] = empty($values[$cid]) ? $token : $values[$cid] + $token;
+}
+}
 }
 
 /**
@@ -146,13 +222,27 @@ function manageorgreps_civicrm_xmlMenu(&$files) {
  */
 function manageorgreps_civicrm_install() {
   $params = array(
-      'version' => '3',
-      'group_type' => 'Contact,Individual',
-      'name' => 'update_organizational_contacts',
-      'title' => 'Update Organizational Contacts',
-      'is_reserved' => 1,
-      'is_active' => 1,
-      );
+    'version' => '3',
+    'name_a_b' => 'Organizational Representative of',
+    'label_a_b' => 'Organizational Representative of',
+    'name_b_a' => 'Organizational Representative is',
+    'label_b_a' => 'Organizational Representative is',
+    'description' => 'Organization Representative relationship',
+    'contact_type_a' => 'Individual',
+    'contact_type_b' => 'Organization',
+    'is_reserved' => 1,
+    'is_active' => 1,
+    );
+  $relationshiptype = civicrm_api('RelationshipType', 'create', $params);
+
+  $params = array(
+    'version' => '3',
+    'group_type' => 'Contact,Individual',
+    'name' => 'update_organizational_contacts',
+    'title' => 'Update Organizational Contacts',
+    'is_reserved' => 1,
+    'is_active' => 1,
+    );
   $ufgroup = civicrm_api('UFGroup', 'create', $params);
   if (!$ufgroup['is_error']){
     $params = array(
@@ -161,7 +251,7 @@ function manageorgreps_civicrm_install() {
       'module' => 'Profile',
       'is_active' => '1',
       'weight' => '1',
-    );
+      );
     $ufjoin = civicrm_api('UFJoin', 'create', $params);
     if ($ufjoin['is_error']){
       print_r($ufjoin['error_message']); die();
@@ -197,7 +287,7 @@ function manageorgreps_civicrm_disable() {
   try{
     $ufjoin = civicrm_api3('UFJoin', 'getSingle', array(
       'uf_group_id' => $profile_id,
-     ));
+      ));
   }
   catch (CiviCRM_API3_Exception $e) {
     $error = $e->getMessage();
@@ -226,47 +316,30 @@ function manageorgreps_civicrm_upgrade($op, CRM_Queue_Queue $queue = NULL) {
  * is installed, disabled, uninstalled.
  */
 function manageorgreps_civicrm_managed(&$entities) {//add uf group and uf fields
-  $entities[] = array(
-    'module' => 'com.aghstrategies.manageorgreps',
-    'name' => 'Organizational Representative Relationship',
-    'entity' => 'RelationshipType',
-    'params' => array(
-      'version' => '3',
-      'name_a_b' => 'Organizational Representative of',
-      'label_a_b' => 'Organizational Representative of',
-      'name_b_a' => 'Organizational Representative is',
-      'label_b_a' => 'Organizational Representative is',
-      'description' => 'Organization Representative relationship',
-      'contact_type_a' => 'Individual',
-      'contact_type_b' => 'Organization',
-      'is_reserved' => 1,
-      'is_active' => 1,
-      ),
-  );
 }
 
 function get_organizational_relationship_id(){
   try{
-     $relationshiptype = civicrm_api3('RelationshipType', 'getSingle', array(
-        'name_a_b'   =>  'Organizational Representative of',
-        'name_b_a' => 'Organizational Representative is',
-     ));
-    }
-  catch (CiviCRM_API3_Exception $e) {
-    $error = $e->getMessage();
-  }
-  return $relationshiptype['id'];
+   $relationshiptype = civicrm_api3('RelationshipType', 'getSingle', array(
+    'name_a_b'   =>  'Organizational Representative of',
+    'name_b_a' => 'Organizational Representative is',
+    ));
+ }
+ catch (CiviCRM_API3_Exception $e) {
+  $error = $e->getMessage();
+}
+return $relationshiptype['id'];
 }
 
 function get_orgrep_profile_id(){
   try{
-     $ufgroup = civicrm_api3('UFGroup', 'getSingle', array(
-      'title' => 'Update Organizational Contacts',
-      'is_reserved' => 1,
-     ));
-    }
-  catch (CiviCRM_API3_Exception $e) {
-    $error = $e->getMessage();
-  }
-  return $ufgroup['id'];
+   $ufgroup = civicrm_api3('UFGroup', 'getSingle', array(
+    'title' => 'Update Organizational Contacts',
+    'is_reserved' => 1,
+    ));
+ }
+ catch (CiviCRM_API3_Exception $e) {
+  $error = $e->getMessage();
+}
+return $ufgroup['id'];
 }
