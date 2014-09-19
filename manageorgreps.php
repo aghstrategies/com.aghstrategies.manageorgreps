@@ -83,10 +83,13 @@ function manageorgreps_civicrm_post($op, $objectName, $objectId, &$objectRef) {
                'version' => 3,
                'id' => $relationship['id'],
                 'start_date' => $start_date,
-                'end_date' => ' ',
                 'is_active' => 1,
+                'end_date' => 'null',
                 );
               $result = civicrm_api('Relationship', 'Create', $params);
+              if (!$result['is_error']){
+                $end_date = civicrm_api('Relationship', 'setvalue', array('version'=> 3, 'field' => 'end_date', 'relationship_id' => $relationship['id'], 'value' => ''));
+              }
             }
           }
         }
