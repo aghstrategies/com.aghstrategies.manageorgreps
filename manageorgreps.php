@@ -52,7 +52,7 @@ function manageorgreps_civicrm_post($op, $objectName, $objectId, &$objectRef) {
     $org_id = $objectRef['organizationalaffiliation'];
     $contact_id = $objectId;
     $relationship_type_id = get_organizational_relationship_id();
-    $start_date = date('Y-m-d');
+    // $start_date = date('Y-m-d');
 
     if ($op=='create'){
       $params = array(
@@ -60,7 +60,7 @@ function manageorgreps_civicrm_post($op, $objectName, $objectId, &$objectRef) {
        'relationship_type_id' => $relationship_type_id,
        'contact_id_a' => $contact_id,
          'contact_id_b' => $org_id, //get org id
-         'start_date' => $start_date,
+         // 'start_date' => $start_date,
          );
       $result = civicrm_api('Relationship', 'Create', $params);
       if ($result['is_error']){
@@ -82,9 +82,9 @@ function manageorgreps_civicrm_post($op, $objectName, $objectId, &$objectRef) {
               $params = array(
                'version' => 3,
                'id' => $relationship['id'],
-                'start_date' => $start_date,
+                // 'start_date' => $start_date,
                 'is_active' => 1,
-                'end_date' => 'null',
+                // 'end_date' => 'null',
                 );
               $result = civicrm_api('Relationship', 'Create', $params);
               if (!$result['is_error']){
@@ -98,8 +98,8 @@ function manageorgreps_civicrm_post($op, $objectName, $objectId, &$objectRef) {
            'version' => 3,
            'relationship_type_id' => $relationship_type_id,
            'contact_id_a' => $contact_id,
-         'contact_id_b' => $org_id, //get org id
-         'start_date' => $start_date,
+           'contact_id_b' => $org_id, //get org id
+         // 'start_date' => $start_date,
          );
           $result = civicrm_api('Relationship', 'Create', $params);
         }
