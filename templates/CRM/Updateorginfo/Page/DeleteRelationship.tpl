@@ -1,4 +1,4 @@
-
+{*TODO get rid of alert make sure is actually deavtiving the relationship ... make a button that uses javascript to do an api call to disable the relationship*}
 <script>
 var relationshipId = {$relationship_id};
 var endDate = "{$end_date}";

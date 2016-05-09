@@ -12,8 +12,12 @@ function _getMenuKeyMax($menuArray) {
   }
   return max($max);
 }
-
-function manageorgreps_civicrm_navigationMenu( &$params ) {
+/**
+ * Implements hook_civicrm_navigationMenu().
+ *
+ * Adds link to edit profile fields
+ */
+function manageorgreps_civicrm_navigationMenu(&$params) {
 
     //  Get the maximum key of $params
   $maxKey = _getMenuKeyMax($params);
@@ -44,17 +48,21 @@ function manageorgreps_civicrm_navigationMenu( &$params ) {
 }
 
 /**
- * Implementation of hook_civicrm_post
+ * Implements hook_civicrm_post().
+ *
+ * creates/updates organizational affiliation relationship upon filling the profile
  */
 function manageorgreps_civicrm_post($op, $objectName, $objectId, &$objectRef) {
   $orgrep_profile_id = get_orgrep_profile_id();
-  if ($objectName=='Profile' && $objectRef['uf_group_id']==$orgrep_profile_id){
+  if ($objectName == 'Profile' && $objectRef['uf_group_id'] == $orgrep_profile_id){
+    //TODO test if object ref is really an array
     $org_id = $objectRef['organizationalaffiliation'];
     $contact_id = $objectId;
     $relationship_type_id = get_organizational_relationship_id();
     // $start_date = date('Y-m-d');
 
-    if ($op=='create'){
+    //TODO check creating contact or using profile  in create mode
+    if ($op == 'create') {
       $params = array(
        'version' => 3,
        'relationship_type_id' => $relationship_type_id,
@@ -109,7 +117,9 @@ function manageorgreps_civicrm_post($op, $objectName, $objectId, &$objectRef) {
 }
 
 /**
- * Implementation of hook_civicrm_buildForm
+ * Implements hook_civicrm_buildForm().
+ *
+ * Provides organizational affiliation field in our profile
  */
 function manageorgreps_civicrm_buildForm($formName, &$form) {
   if ($formName == 'CRM_Profile_Form_Edit'){
@@ -122,7 +132,8 @@ function manageorgreps_civicrm_buildForm($formName, &$form) {
         $org_id = $_GET['org_id'];
       }
       $form->assign('org_id', $org_id);
-    // $ the field element in the form
+      // $ the field element in the form
+      // TODO check if testfield is needed still
       $form->add('text', 'testfield', ts('Test field'));
     // dynamically insert a template block in the page
       $templatePath = realpath(dirname(__FILE__)."/templates");
@@ -130,13 +141,14 @@ function manageorgreps_civicrm_buildForm($formName, &$form) {
         'template' => "{$templatePath}/organizationalaffiliation.tpl"
         ));
     }
+    //TODO does this script do anything? appears not
     CRM_Core_Resources::singleton()->addScriptFile('com.aghstrategies.manageorgreps', 'js/getorgname.js');
 
   }
 }
 
 /**
- * Implementation of hook_civicrm_token
+ * Implements hook_civicrm_tokens().
  */
 function manageorgreps_civicrm_tokens( &$tokens ) {
   $tokens['org_reps'] = array(
@@ -146,7 +158,9 @@ function manageorgreps_civicrm_tokens( &$tokens ) {
 }
 
 /**
- * Implementation of hook_civicrm_tokenValues
+ * Implements hook_civicrm_tokenValues().
+ *
+ * Populates values for the tokens
  */
 function manageorgreps_civicrm_tokenValues(&$values, $cids, $job = null, $tokens = array(), $context = null) {
   $orgrep_profile_id = get_orgrep_profile_id();
@@ -221,7 +235,9 @@ function manageorgreps_civicrm_xmlMenu(&$files) {
 }
 
 /**
- * Implementation of hook_civicrm_install
+ * Implements hook_civicrm_install().
+ *
+ * Creates relationship type and profile
  */
 function manageorgreps_civicrm_install() {
   $params = array(

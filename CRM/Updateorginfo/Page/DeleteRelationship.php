@@ -11,6 +11,7 @@ class CRM_Updateorginfo_Page_DeleteRelationship extends CRM_Core_Page {
     $this->assign('contact_delete_link', $contact_delete_link);
     $this->assign('relationship_id', $relationship_id);
     $this->assign('end_date', $end_date);
+    //TODO what is this constant CIVICRM_B
     $this->assign('home', CIVICRM_B);
     // Example: Assign a variable for use in a template
 
